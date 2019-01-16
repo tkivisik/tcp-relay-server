@@ -1,13 +1,21 @@
 #!/usr/bin/bash
 
 # relay server setup
-go run main.go -regport 9999 &
+# relaystyle 0 - client side port will be random
+# relaystyle 1 - client side port will be regport + n registerd apps + 1
+go run main.go -regport 9999 -relaystyle 1 &
 sleep 1
 
 # register apps
-go run echo/echo.go -regport 9999 &
+go run echoToRun/echo.go -regportecho 9999 &
 sleep 1
-go run echo/echo.go -regport 9999 &
+go run echoToRun/echo.go -regportecho 9999 &
 
-# connect to relayedport by running:
-# telnet localhost <port shown to screen>
+## Run in terminal 1
+# while true; do echo term1 ;  done | nc -q 1 -w 1 localhost 10000
+
+## Run in terminal 2
+# while true; do echo term2 ;  done | nc -q 1 -w 1 localhost 10000
+
+## connect to relayedport by running:
+# telnet localhost 10000
