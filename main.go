@@ -14,16 +14,22 @@ const (
 	INCREMENTONE
 )
 
+var network string
+var regPort, relayStyle int
+var port int
+var mux sync.Mutex
+
 func init() {
 	flag.StringVar(&network, "network", "tcp", "network to use")
 	flag.IntVar(&regPort, "regport", 8080, "port for registering relayable apps")
 	flag.IntVar(&relayStyle, "relaystyle", INCREMENTONE, fmt.Sprintf("%d for random, %d for incrementing one", RANDOM, INCREMENTONE))
 }
 
-var network string
-var regPort, relayStyle int
-
 func main() {
+	RunTCPServer()
+}
+
+func RunTCPServer() {
 	flag.Parse()
 
 	// Listen to register Apps
@@ -32,18 +38,11 @@ func main() {
 	for {
 		// Accept a connection from an App
 		connAppCommand := acceptConnections(regListener)
-		defer func() {
-			log.Printf("%s closed.\n", connAppCommand.RemoteAddr())
-			connAppCommand.Close()
-		}()
 
 		// Listen for clients for a registered App
 		go handleClientsForApp(connAppCommand, regPort, relayStyle)
 	}
 }
-
-var port int
-var mux sync.Mutex
 
 func newPort(regPort, relayStyle int) int {
 	if relayStyle == INCREMENTONE {
@@ -60,6 +59,11 @@ func newPort(regPort, relayStyle int) int {
 
 // handleClientsForApp sets up an external endpoint and mediates client-app-client communication
 func handleClientsForApp(connAppCommand net.Conn, regPort, relayStyle int) {
+	defer func() {
+		log.Printf("%s closed.\n", connAppCommand.RemoteAddr())
+		connAppCommand.Close()
+	}()
+
 	nextPort := newPort(regPort, relayStyle)
 
 	// port=0 will pick an available port
@@ -67,7 +71,7 @@ func handleClientsForApp(connAppCommand net.Conn, regPort, relayStyle int) {
 	relayedPort := clientListener.Addr().(*net.TCPAddr).Port
 	log.Printf("listening for clients on port: %d\n", relayedPort)
 	// Notify App of it's external relayed port
-	fmt.Fprintf(connAppCommand, fmt.Sprintf("established relay address port:%d\n", relayedPort))
+	fmt.Fprintf(connAppCommand, "established relay address port:%d\n", relayedPort)
 	for {
 		connClientToRelay := acceptConnections(clientListener)
 		defer func() {
@@ -79,7 +83,7 @@ func handleClientsForApp(connAppCommand net.Conn, regPort, relayStyle int) {
 		nextPort := newPort(regPort, RANDOM)
 		appClientListener := listenForConnections(connAppCommand.LocalAddr().Network(), nextPort)
 		appClientPort := appClientListener.Addr().(*net.TCPAddr).Port //clientListener.Addr().(*net.TCPAddr).Port
-		fmt.Fprintf(connAppCommand, fmt.Sprintf("%d\n", appClientPort))
+		fmt.Fprintf(connAppCommand, "%d\n", appClientPort)
 		log.Printf("listening for AppClient connections on port: %d\n", appClientPort)
 		connAppClient := acceptConnections(appClientListener)
 		defer func() {

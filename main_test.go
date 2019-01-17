@@ -77,7 +77,7 @@ func TestAcceptConnections(t *testing.T) {
 // TestEcho makes a system level end to end test.
 func TestEcho(t *testing.T) {
 	message := []byte("testing123")
-	go main()
+	go RunTCPServer()
 	go echo.Run()
 
 	// Give some time for the setup
