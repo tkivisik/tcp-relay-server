@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 
 	echo "github.com/tkivisik/tcp-relay-server/sampleappecho"
 )
@@ -14,6 +15,7 @@ import (
 const (
 	RANDOM int = iota
 	INCREMENTONE
+	timeout = time.Minute
 )
 
 var network string
@@ -68,7 +70,7 @@ func newPort(regPort, relayStyle int) int {
 // handleClientsForApp sets up an external endpoint and mediates client-app-client communication
 func handleClientsForApp(connAppCommand net.Conn, regPort, relayStyle int) {
 	defer func() {
-		log.Printf("%s closed.\n", connAppCommand.RemoteAddr())
+		log.Printf("%s (connAppCommand) closed.\n", connAppCommand.RemoteAddr())
 		connAppCommand.Close()
 	}()
 
@@ -82,25 +84,31 @@ func handleClientsForApp(connAppCommand net.Conn, regPort, relayStyle int) {
 	fmt.Fprintf(connAppCommand, "established relay address port:%d\n", relayedPort)
 	for {
 		connClientToRelay := acceptConnections(clientListener)
-		defer func() {
-			log.Printf("%s closed.\n", connClientToRelay.RemoteAddr())
-			connClientToRelay.Close()
-		}()
 
-		// Ask an App to make a new connection to a new socket for each client.
-		nextPort := newPort(regPort, RANDOM)
-		appClientListener := listenForConnections(connAppCommand.LocalAddr().Network(), nextPort)
-		appClientPort := appClientListener.Addr().(*net.TCPAddr).Port //clientListener.Addr().(*net.TCPAddr).Port
-		fmt.Fprintf(connAppCommand, "%d\n", appClientPort)
-		log.Printf("listening for AppClient connections on port: %d\n", appClientPort)
-		connAppClient := acceptConnections(appClientListener)
-		defer func() {
-			log.Printf("%s closed.\n", connClientToRelay.RemoteAddr())
-			connClientToRelay.Close()
-		}()
+		go func(connClientToRelay net.Conn) {
+			defer func() {
+				log.Printf("%s (connClientToRelay) closed.\n", connClientToRelay.RemoteAddr())
+				connClientToRelay.Close()
+			}()
 
-		go io.Copy(connAppClient, connClientToRelay)
-		go io.Copy(connClientToRelay, connAppClient)
+			// Ask an App to make a new connection to a new socket for each client.
+			nextPort := newPort(regPort, RANDOM)
+			appClientListener := listenForConnections(connAppCommand.LocalAddr().Network(), nextPort)
+			appClientPort := appClientListener.Addr().(*net.TCPAddr).Port //clientListener.Addr().(*net.TCPAddr).Port
+			fmt.Fprintf(connAppCommand, "%d\n", appClientPort)
+			log.Printf("listening for AppClient connections on port: %d\n", appClientPort)
+			connAppClient := acceptConnections(appClientListener)
+			defer func() {
+				log.Printf("%s (connAppClinet) closed.\n", connAppClient.RemoteAddr())
+				connAppClient.Close()
+			}()
+
+			go io.Copy(connAppClient, connClientToRelay)
+			go io.Copy(connClientToRelay, connAppClient)
+
+			time.Sleep(timeout) // TODO - rewrite to close whenever any connections are lost
+
+		}(connClientToRelay)
 	}
 }
 
