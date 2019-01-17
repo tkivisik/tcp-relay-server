@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"sync"
+
+	echo "github.com/tkivisik/tcp-relay-server/sampleappecho"
 )
 
 const (
@@ -16,6 +18,7 @@ const (
 
 var network string
 var regPort, relayStyle int
+var sampleApp bool
 var port int
 var mux sync.Mutex
 
@@ -23,15 +26,20 @@ func init() {
 	flag.StringVar(&network, "network", "tcp", "network to use")
 	flag.IntVar(&regPort, "regport", 8080, "port for registering relayable apps")
 	flag.IntVar(&relayStyle, "relaystyle", INCREMENTONE, fmt.Sprintf("%d for random, %d for incrementing one", RANDOM, INCREMENTONE))
+	flag.BoolVar(&sampleApp, "sampleapp", false, "run a sample echo server app")
 }
 
 func main() {
-	RunTCPServer()
+	flag.Parse()
+
+	if sampleApp {
+		echo.Run()
+	} else {
+		RunTCPServer()
+	}
 }
 
 func RunTCPServer() {
-	flag.Parse()
-
 	// Listen to register Apps
 	regListener := listenForConnections(network, regPort)
 	log.Printf("listening for relayable apps to register on port: %d\n", regPort)

@@ -15,14 +15,17 @@ import (
 var networkEcho, iPv4Echo string
 var regPortEcho int
 
+func init() {
+	flag.StringVar(&networkEcho, "networkecho", "tcp", "networkEcho to use")
+	flag.StringVar(&iPv4Echo, "ip", "localhost", "relay server iPv4Echo")
+	flag.IntVar(&regPortEcho, "regportecho", 8080, "port for registering relayable apps")
+}
+
 func main() {
 	Run()
 }
 
 func Run() {
-	flag.StringVar(&networkEcho, "networkEcho", "tcp", "networkEcho to use")
-	flag.StringVar(&iPv4Echo, "ip", "localhost", "relay server iPv4Echo")
-	flag.IntVar(&regPortEcho, "regPortEcho", 8080, "port for registering relayable apps")
 	flag.Parse()
 	socket := fmt.Sprintf("%s:%d", iPv4Echo, regPortEcho)
 	// Register the new app, be informed about clients through it.

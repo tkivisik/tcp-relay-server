@@ -7,9 +7,9 @@ go run main.go -regport 9999 -relaystyle 1 &
 sleep 1
 
 # register apps
-go run echoToRun/echo.go -regportecho 9999 &
+go run main.go -sampleapp -regportecho 9999 &
 sleep 1
-go run echoToRun/echo.go -regportecho 9999 &
+go run main.go -sampleapp -regportecho 9999 &
 
 ## Run in terminal 1
 # while true; do echo term1 ;  done | nc -q 1 -w 1 localhost 10000

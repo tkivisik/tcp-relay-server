@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	echo "github.com/tkivisik/tcp-relay-server/echoForTest"
+	echo "github.com/tkivisik/tcp-relay-server/sampleappecho"
 )
 
 // TestListenForConnections tests for network and port
