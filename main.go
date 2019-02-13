@@ -18,11 +18,13 @@ const (
 	timeout = time.Minute
 )
 
-var network string
-var regPort, relayStyle int
-var sampleApp bool
-var port int
-var mux sync.Mutex
+var (
+	network             string
+	regPort, relayStyle int
+	sampleApp           bool
+	port                int
+	mux                 sync.Mutex
+)
 
 func init() {
 	flag.StringVar(&network, "network", "tcp", "network to use")
@@ -57,11 +59,11 @@ func RunTCPServer() {
 func newPort(regPort, relayStyle int) int {
 	if relayStyle == INCREMENTONE {
 		mux.Lock()
+		defer mux.Unlock()
 		if port == 0 {
 			port = regPort
 		}
 		port++
-		mux.Unlock()
 		return port
 	}
 	return 0
