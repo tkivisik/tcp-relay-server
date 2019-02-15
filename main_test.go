@@ -15,19 +15,15 @@ import (
 // TestListenForConnections tests for network and port
 func TestListenForConnections(t *testing.T) {
 	tables := []struct {
-		network string
-		port    int
+		port int
 	}{
-		{"tcp", 8080},
-		{"tcp", 9090},
+		{8080},
+		{9090},
 	}
 	for _, table := range tables {
-		listener := listenForConnections(table.network, table.port)
+		listener := listenForConnections(table.port)
 		defer listener.Close()
 
-		if network := listener.Addr().Network(); network != table.network {
-			t.Errorf("Network not as expected, got: %s, want: %s.", network, table.network)
-		}
 		if address := listener.Addr().String(); strings.HasSuffix(address, strconv.Itoa(table.port)) == false {
 			t.Errorf("Port not as expected, got: %s, want: %s.", address, strconv.Itoa(table.port))
 		}
@@ -41,8 +37,8 @@ func TestListenForConnectionsPanic(t *testing.T) {
 			t.Errorf("The code did not panic")
 		}
 	}()
-	listener1 := listenForConnections("tcp", 9990)
-	listener2 := listenForConnections("tcp", 9990)
+	listener1 := listenForConnections(9990)
+	listener2 := listenForConnections(9990)
 	listener1.Close()
 	listener2.Close()
 
@@ -52,7 +48,7 @@ func TestListenForConnectionsPanic(t *testing.T) {
 // Currently the worst test :)
 func TestAcceptConnections(t *testing.T) {
 	wg := sync.WaitGroup{}
-	listener := listenForConnections("tcp", 31331)
+	listener := listenForConnections(31331)
 	defer listener.Close()
 	go func() {
 		conn := acceptConnections(listener)
@@ -77,19 +73,20 @@ func TestAcceptConnections(t *testing.T) {
 // TestEcho makes a system level end to end test.
 func TestEcho(t *testing.T) {
 	message := []byte("testing123")
-	go RunTCPServer()
-	go echo.Run()
+	regPort := 8080
 
+	go RunTCPServer(regPort, 1)
+	go echo.Run()
 	// Give some time for the setup
 	time.Sleep(time.Second / 200)
 
 	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
 		IP:   net.ParseIP("127.0.0.1"),
-		Port: 8081,
+		Port: regPort + 1,
 		Zone: "",
 	})
 	if err != nil {
-		t.Errorf("Connection failed, was expecting success on port 8081. %s", err)
+		t.Errorf("Connection failed, was expecting success on port %d. %s", regPort+1, err)
 	}
 	defer conn.Close()
 	conn.Write(message)

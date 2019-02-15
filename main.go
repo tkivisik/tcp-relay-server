@@ -6,46 +6,39 @@ import (
 	"io"
 	"log"
 	"net"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	echo "github.com/tkivisik/tcp-relay-server/sampleappecho"
 )
 
 const (
-	RANDOM int = iota
-	INCREMENTONE
-	timeout = time.Minute
+	timeout          = time.Minute
+	RANDOM       int = 0
+	INCREMENTONE int = 1
 )
 
 var (
-	network             string
-	regPort, relayStyle int
-	sampleApp           bool
-	port                int
-	mux                 sync.Mutex
+	portGlobal int32
 )
 
-func init() {
-	flag.StringVar(&network, "network", "tcp", "network to use")
-	flag.IntVar(&regPort, "regport", 8080, "port for registering relayable apps")
-	flag.IntVar(&relayStyle, "relaystyle", INCREMENTONE, fmt.Sprintf("%d for random, %d for incrementing one", RANDOM, INCREMENTONE))
-	flag.BoolVar(&sampleApp, "sampleapp", false, "run a sample echo server app")
-}
-
 func main() {
+	regPort := flag.Int("regport", 8080, "port for registering relayable apps")
+	relayStyle := flag.Int("relaystyle", INCREMENTONE, fmt.Sprintf("%d for random, %d for incrementing one", RANDOM, INCREMENTONE))
+	sampleApp := flag.Bool("sampleapp", false, "run a sample echo server app")
 	flag.Parse()
 
-	if sampleApp {
+	if *sampleApp {
 		echo.Run()
 	} else {
-		RunTCPServer()
+		RunTCPServer(*regPort, *relayStyle)
 	}
 }
 
-func RunTCPServer() {
+func RunTCPServer(regPort int, relayStyle int) {
+	atomic.AddInt32(&portGlobal, int32(regPort))
 	// Listen to register Apps
-	regListener := listenForConnections(network, regPort)
+	regListener := listenForConnections(regPort)
 	log.Printf("listening for relayable apps to register on port: %d\n", regPort)
 	for {
 		// Accept a connection from an App
@@ -58,13 +51,8 @@ func RunTCPServer() {
 
 func newPort(regPort, relayStyle int) int {
 	if relayStyle == INCREMENTONE {
-		mux.Lock()
-		defer mux.Unlock()
-		if port == 0 {
-			port = regPort
-		}
-		port++
-		return port
+		new := atomic.AddInt32(&portGlobal, 1)
+		return int(new)
 	}
 	return 0
 }
@@ -79,7 +67,7 @@ func handleClientsForApp(connAppCommand net.Conn, regPort, relayStyle int) {
 	nextPort := newPort(regPort, relayStyle)
 
 	// port=0 will pick an available port
-	clientListener := listenForConnections(connAppCommand.LocalAddr().Network(), nextPort)
+	clientListener := listenForConnections(nextPort)
 	relayedPort := clientListener.Addr().(*net.TCPAddr).Port
 	log.Printf("listening for clients on port: %d\n", relayedPort)
 	// Notify App of it's external relayed port
@@ -95,7 +83,7 @@ func handleClientsForApp(connAppCommand net.Conn, regPort, relayStyle int) {
 
 			// Ask an App to make a new connection to a new socket for each client.
 			nextPort := newPort(regPort, RANDOM)
-			appClientListener := listenForConnections(connAppCommand.LocalAddr().Network(), nextPort)
+			appClientListener := listenForConnections(nextPort)
 			appClientPort := appClientListener.Addr().(*net.TCPAddr).Port //clientListener.Addr().(*net.TCPAddr).Port
 			fmt.Fprintf(connAppCommand, "%d\n", appClientPort)
 			log.Printf("listening for AppClient connections on port: %d\n", appClientPort)
@@ -115,9 +103,9 @@ func handleClientsForApp(connAppCommand net.Conn, regPort, relayStyle int) {
 }
 
 // listenForConnections sets up an endpoint which listens for connections
-func listenForConnections(network string, port int) net.Listener {
+func listenForConnections(port int) net.Listener {
 	// Set up endpoint for registering Apps
-	regTCPListener, err := net.ListenTCP(network, &net.TCPAddr{
+	regTCPListener, err := net.ListenTCP("tcp", &net.TCPAddr{
 		IP:   net.ParseIP("127.0.0.1"),
 		Port: port,
 		Zone: "",
