@@ -50,8 +50,10 @@ go build -race
 
 ## Static Analysis
 
+[golangci-lint](https://github.com/golangci/golangci-lint) in GitHub
+
 ```bash
-circleci-lint run
+golangci-lint run
 ```
 
 ## Further development
